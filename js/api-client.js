@@ -1,6 +1,7 @@
 /**
  * API Client for handling server requests
  * Supports both local development and production environments
+ * Waits for authentication to be ready before making requests
  */
 
 // Determine API base URL based on environment
@@ -28,17 +29,21 @@ const getApiBaseUrl = () => {
     
     /**
      * Get Telegram init data (for auth)
-     * @returns {string|null} - Telegram init data or null for local development
+     * @returns {Promise<string|null>} - Telegram init data or null for local development
      */
-    getTelegramInitData: function() {
+    async getTelegramInitData() {
+      // Wait for auth to be ready if the function exists
+      if (window.waitForAuth) {
+        await window.waitForAuth();
+      }
+      
       // If we're in Telegram webview and window.Telegram is available
       if (window.Telegram && window.Telegram.WebApp) {
         return window.Telegram.WebApp.initData;
       }
       
-      // For local development, return mock data or null
+      // For local development, return mock data
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        // You can create mock telegram data here for testing
         console.log('Using mock Telegram auth for local development');
         return 'mock_telegram_init_data';
       }
@@ -55,15 +60,25 @@ const getApiBaseUrl = () => {
       console.log(`API Request: GET ${this.baseUrl}${endpoint}`);
       
       try {
+        // Wait for auth to be ready
+        if (window.waitForAuth) {
+          await window.waitForAuth();
+        }
+        
         // Prepare headers with auth data
         const headers = {
           'Accept': 'application/json'
         };
         
         // Add Telegram init data if available
-        const telegramInitData = this.getTelegramInitData();
+        const telegramInitData = await this.getTelegramInitData();
         if (telegramInitData) {
           headers['X-Telegram-Init-Data'] = telegramInitData;
+        }
+        
+        // Add user ID header which is more reliable
+        if (window.currentUserId) {
+          headers['X-User-ID'] = window.currentUserId;
         }
         
         // Make the request
@@ -101,27 +116,37 @@ const getApiBaseUrl = () => {
      * @returns {Promise<any>} - Response data
      */
     async post(endpoint, data = null) {
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        mode: 'cors',
-        credentials: 'same-origin'
-      };
-      
-      // Add Telegram init data if available
-      const telegramInitData = this.getTelegramInitData();
-      if (telegramInitData) {
-        options.headers['X-Telegram-Init-Data'] = telegramInitData;
-      }
-      
-      if (data) {
-        options.body = JSON.stringify(data);
-      }
-      
       try {
+        // Wait for auth to be ready
+        if (window.waitForAuth) {
+          await window.waitForAuth();
+        }
+        
+        const options = {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          mode: 'cors',
+          credentials: 'same-origin'
+        };
+        
+        // Add Telegram init data if available
+        const telegramInitData = await this.getTelegramInitData();
+        if (telegramInitData) {
+          options.headers['X-Telegram-Init-Data'] = telegramInitData;
+        }
+        
+        // Add user ID header which is more reliable
+        if (window.currentUserId) {
+          options.headers['X-User-ID'] = window.currentUserId;
+        }
+        
+        if (data) {
+          options.body = JSON.stringify(data);
+        }
+        
         console.log(`Making POST request to: ${this.baseUrl}${endpoint}`, data);
         const response = await fetch(`${this.baseUrl}${endpoint}`, options);
         
@@ -151,15 +176,25 @@ const getApiBaseUrl = () => {
       console.log(`API Request: DELETE ${this.baseUrl}${endpoint}`);
       
       try {
+        // Wait for auth to be ready
+        if (window.waitForAuth) {
+          await window.waitForAuth();
+        }
+        
         // Prepare headers with auth data
         const headers = {
           'Accept': 'application/json'
         };
         
         // Add Telegram init data if available
-        const telegramInitData = this.getTelegramInitData();
+        const telegramInitData = await this.getTelegramInitData();
         if (telegramInitData) {
           headers['X-Telegram-Init-Data'] = telegramInitData;
+        }
+        
+        // Add user ID header which is more reliable
+        if (window.currentUserId) {
+          headers['X-User-ID'] = window.currentUserId;
         }
         
         const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -185,6 +220,64 @@ const getApiBaseUrl = () => {
         return data;
       } catch (error) {
         console.error('API Request error:', error);
+        throw error;
+      }
+    },
+    
+    /**
+     * Make a PATCH request
+     * @param {string} endpoint - API endpoint
+     * @param {object} data - Request body
+     * @returns {Promise<any>} - Response data
+     */
+    async patch(endpoint, data = null) {
+      try {
+        // Wait for auth to be ready
+        if (window.waitForAuth) {
+          await window.waitForAuth();
+        }
+        
+        const options = {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          mode: 'cors',
+          credentials: 'same-origin'
+        };
+        
+        // Add Telegram init data if available
+        const telegramInitData = await this.getTelegramInitData();
+        if (telegramInitData) {
+          options.headers['X-Telegram-Init-Data'] = telegramInitData;
+        }
+        
+        // Add user ID header which is more reliable
+        if (window.currentUserId) {
+          options.headers['X-User-ID'] = window.currentUserId;
+        }
+        
+        if (data) {
+          options.body = JSON.stringify(data);
+        }
+        
+        console.log(`Making PATCH request to: ${this.baseUrl}${endpoint}`, data);
+        const response = await fetch(`${this.baseUrl}${endpoint}`, options);
+        
+        if (!response.ok) {
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            errorData = { error: await response.text() || response.statusText };
+          }
+          throw new Error(errorData?.error || `HTTP error ${response.status}`);
+        }
+        
+        return response.json();
+      } catch (error) {
+        console.error('API request failed:', error);
         throw error;
       }
     }
@@ -213,3 +306,5 @@ const getApiBaseUrl = () => {
     }
     return null;
   };
+  
+  console.log(`API Client initialized with base URL: ${apiClient.baseUrl}`);

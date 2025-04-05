@@ -2,9 +2,15 @@
  * Authentication Helper for Telegram Web App
  * - Handles Telegram WebApp authentication
  * - Provides mock data for local development
+ * - Ensures user is initialized before app loads
  */
 
 (function() {
+    // Create a promise that will resolve when user auth is ready
+    window.authReadyPromise = new Promise((resolve) => {
+      window._resolveAuthReady = resolve;
+    });
+    
     // App environment detection
     window.appEnvironment = {
       isLocalhost: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
@@ -12,11 +18,48 @@
       isDevelopment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     };
     
+    // Parse Telegram Web App init data from URL
+    function parseWebAppInitData() {
+      try {
+        // Check if we have tgWebAppData in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        let initData = urlParams.get('tgWebAppData');
+        
+        // If not in URL params, check hash
+        if (!initData && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          initData = hashParams.get('tgWebAppData');
+        }
+        
+        if (initData) {
+          // Parse the data - in real implementation, this is url-encoded
+          const decodedData = decodeURIComponent(initData);
+          const params = {};
+          
+          decodedData.split('&').forEach(item => {
+            const [key, value] = item.split('=');
+            params[key] = decodeURIComponent(value);
+          });
+          
+          // Extract user data
+          if (params.user) {
+            try {
+              return JSON.parse(params.user);
+            } catch (e) {
+              console.error('Failed to parse user data:', e);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing WebApp init data:', e);
+      }
+      return null;
+    }
+    
     // Check if script is within a Telegram WebApp environment
     function isTelegramWebApp() {
-      // More robust check - window.Telegram might be initialized but WebApp might not be ready yet
-      if (window.Telegram) {
-        // If Telegram exists, most likely it's the WebApp
+      // Most reliable check - if Telegram WebApp has already initialized
+      if (window.Telegram && window.Telegram.WebApp) {
         return true;
       }
       
@@ -38,92 +81,116 @@
       return false;
     }
     
+    // Extract user ID from various sources
+    function extractUserId() {
+      // First check the WebApp object if available
+      if (window.Telegram && window.Telegram.WebApp && 
+          window.Telegram.WebApp.initDataUnsafe && 
+          window.Telegram.WebApp.initDataUnsafe.user) {
+        
+        return window.Telegram.WebApp.initDataUnsafe.user.id;
+      }
+      
+      // Try to parse from URL parameters
+      const userData = parseWebAppInitData();
+      if (userData && userData.id) {
+        return userData.id;
+      }
+      
+      return null;
+    }
+    
     // Initialize userId - either from Telegram or generate mock for local development
     function initializeUserId() {
+      const isInTelegram = isTelegramWebApp();
+      window.isTelegramEnvironment = isInTelegram;
+      
       // For local development, use stored ID or create a new one
       if (window.appEnvironment.isLocalhost) {
-        // Try to retrieve from localStorage first
         let storedId = localStorage.getItem('userId');
         
         if (!storedId) {
-          // Generate a deterministic ID for local testing
           storedId = 'local_user_' + Math.random().toString(36).substring(2, 10);
           localStorage.setItem('userId', storedId);
         }
         
         window.currentUserId = storedId;
         console.log('Using mock user ID for local development:', window.currentUserId);
+        window._resolveAuthReady(window.currentUserId); // Resolve the auth promise for local dev
         return window.currentUserId;
       }
       
-      // Detect if we're in a Telegram WebApp environment
-      const isTelegramEnv = isTelegramWebApp();
-      
-      if (isTelegramEnv) {
-        // Even if the WebApp object isn't fully available yet, 
-        // we'll note that we're in Telegram and wait for it to be ready
-        window.isTelegramEnvironment = true;
-        console.log('Telegram WebApp environment detected, waiting for initialization...');
+      // In Telegram WebApp environment
+      if (isInTelegram) {
+        console.log('Telegram WebApp environment detected');
         
-        // If WebApp is already available, get the user ID
-        if (window.Telegram && window.Telegram.WebApp && 
-            window.Telegram.WebApp.initDataUnsafe && 
-            window.Telegram.WebApp.initDataUnsafe.user) {
-          
-          const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
-          window.currentUserId = telegramUser.id;
+        // First try to extract ID synchronously
+        const userId = extractUserId();
+        if (userId) {
+          window.currentUserId = userId;
           console.log('Using Telegram user ID:', window.currentUserId);
-        } else {
-          // Temporary ID until Telegram WebApp is ready
-          window.currentUserId = 'telegram_user_initializing';
-          
-          // Setup a listener for when Telegram WebApp becomes available
-          const telegramInitInterval = setInterval(function() {
-            if (window.Telegram && window.Telegram.WebApp && 
-                window.Telegram.WebApp.initDataUnsafe && 
-                window.Telegram.WebApp.initDataUnsafe.user) {
-              
-              const telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
-              window.currentUserId = telegramUser.id;
-              console.log('Telegram WebApp initialized, using user ID:', window.currentUserId);
-              
-              // Only try to redisplay user info if function exists
-              if (typeof window.displayUserInfo === 'function') {
-                window.displayUserInfo();
-              }
-              
-              clearInterval(telegramInitInterval);
-            }
-          }, 100);
+          window._resolveAuthReady(window.currentUserId); // Resolve the auth promise
+          return window.currentUserId;
         }
         
-        return window.currentUserId;
+        console.log('Waiting for Telegram WebApp initialization...');
+        window.currentUserId = null;
+        
+        // If WebApp script is not loaded yet, add the script
+        if (!window.Telegram) {
+          console.log('Adding Telegram WebApp script');
+          const script = document.createElement('script');
+          script.src = 'https://telegram.org/js/telegram-web-app.js';
+          document.head.appendChild(script);
+        }
+        
+        // Setup a listener for when Telegram WebApp becomes available
+        const maxWaitTime = 5000; // 5 seconds max wait time
+        const startTime = Date.now();
+        
+        const telegramInitInterval = setInterval(function() {
+          // Try again to extract user ID
+          const userId = extractUserId();
+          
+          if (userId) {
+            window.currentUserId = userId;
+            console.log('Telegram WebApp initialized, using user ID:', window.currentUserId);
+            clearInterval(telegramInitInterval);
+            window._resolveAuthReady(window.currentUserId); // Resolve the auth promise
+            return;
+          }
+          
+          // Check timeout
+          if (Date.now() - startTime > maxWaitTime) {
+            console.warn('Telegram WebApp initialization timed out, using fallback');
+            clearInterval(telegramInitInterval);
+            
+            // Fallback when timeout - use a browser session ID
+            window.currentUserId = 'telegram_user_' + Date.now();
+            window._resolveAuthReady(window.currentUserId); // Resolve the auth promise with fallback ID
+          }
+        }, 100);
+        
+        return null; // We don't have the ID yet, but the interval will set it
       }
       
       // Fallback - not in Telegram and not localhost
-      window.currentUserId = localStorage.getItem('userId') || 'user_' + Date.now();
+      console.log('Not running in Telegram WebApp or local environment');
+      window.currentUserId = localStorage.getItem('userId') || 'browser_user_' + Date.now();
+      window._resolveAuthReady(window.currentUserId); // Resolve the auth promise
       return window.currentUserId;
     }
     
-    // Initialize auth
-    function initializeAuth() {
-      // Set up user ID
-      initializeUserId();
-      
-      // If in a known Telegram environment but WebApp isn't ready,
-      // skip mock creation - we'll wait for the real one
-      if (window.isTelegramEnvironment) {
+    // Configure Telegram WebApp or create mock
+    function configureTelegramWebApp() {
+      // If WebApp is already available, we're done
+      if (window.Telegram && window.Telegram.WebApp) {
+        console.log('Telegram WebApp is ready');
         return;
       }
       
-      // If WebApp is already available, configure it
-      if (window.Telegram && window.Telegram.WebApp) {
-        console.log('Telegram WebApp detected and ready');
-        // We'll let the main.js handle detailed configuration
-      } 
       // Create mock only for local development
-      else if (window.appEnvironment.isLocalhost) {
-        // Mock Telegram WebApp object for local testing
+      if (window.appEnvironment.isLocalhost) {
         console.log('Creating mock Telegram WebApp for local development');
         
         window.Telegram = {
@@ -167,6 +234,10 @@
             expand: function() {
               console.log('Mock expand called');
             },
+            openLink: function(url) {
+              console.log('Mock openLink called with:', url);
+              window.open(url, '_blank');
+            },
             colorScheme: 'dark',
             viewportStableHeight: window.innerHeight
           }
@@ -174,10 +245,23 @@
       }
     }
     
+    // Initialize auth
+    function initializeAuth() {
+      // Set up user ID
+      initializeUserId();
+      
+      // Configure Telegram WebApp or create mock
+      configureTelegramWebApp();
+    }
+    
     // Initialize as soon as script loads
     initializeAuth();
     
     // Make helper functions available globally
+    window.waitForAuth = function() {
+      return window.authReadyPromise;
+    };
+    
     window.isTelegramWebApp = function() {
       return window.isTelegramEnvironment || 
              (window.Telegram && window.Telegram.WebApp);

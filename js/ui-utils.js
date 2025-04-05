@@ -109,6 +109,21 @@ const { isLocalhost, isGithubPages, isDevelopment } = window.appEnvironment || {
     const userInfoDiv = document.getElementById('user-info');
     if (!userInfoDiv) return;
     
+    // Wait for auth to be ready
+    if (window.waitForAuth) {
+      window.waitForAuth().then(() => {
+        updateUserInfo(userInfoDiv);
+      });
+    } else {
+      updateUserInfo(userInfoDiv);
+    }
+  }
+  
+  /**
+   * Update the user info div with current user information
+   * @param {HTMLElement} userInfoDiv - The user info div element
+   */
+  function updateUserInfo(userInfoDiv) {
     // Get user information from Telegram if available
     const user = window.getTelegramUser ? window.getTelegramUser() : null;
     
@@ -125,15 +140,16 @@ const { isLocalhost, isGithubPages, isDevelopment } = window.appEnvironment || {
       console.log('Displayed Telegram user info:', user.first_name, user.last_name);
     } else {
       // Fallback for non-Telegram user
-      const initials = 'LU'; // Local User
-      const userAvatar = `<div class="user-avatar">${initials}</div>`;
+      const userId = window.currentUserId || 'Unknown';
+      const userInitials = userId.substring(0, 2).toUpperCase();
+      const userAvatar = `<div class="user-avatar">${userInitials}</div>`;
       
       userInfoDiv.innerHTML = `
         ${userAvatar}
-        <div class="user-name">User (${window.currentUserId})</div>
+        <div class="user-name">User (${userId})</div>
       `;
       
-      console.log('Displayed local user info with ID:', window.currentUserId);
+      console.log('Displayed user info with ID:', userId);
     }
   }
   
