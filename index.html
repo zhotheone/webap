@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, maximum-scale=1.0, user-scalable=no">
+    <title>TGWebApp</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/fira_code.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="js/auth-helper.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/scroll-effects.js"></script>
+    <script src="js/ratings.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <div id="user-info" class="user-info">
+            <!-- User info will be here -->
+        </div>
+        <div class="top-nav">
+            <button class="top-nav-item active" data-section="media-gallery">
+                <span class="material-symbols-outlined">grid_view</span>
+                Gallery
+            </button>
+            <button class="top-nav-item" data-section="media-search">
+                <span class="material-symbols-outlined">search</span>
+                Search
+            </button>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <!-- Ratings Section -->
+        <section id="ratings-section" class="tab-content active">
+            <!-- Media View Sections -->
+            <div id="media-gallery" class="media-section active">
+                <div class="filter-controls">
+                    <h3 class="section-title">Your Ratings ⭐</h3>
+                    <div class="filter-actions">
+                        <div class="select-field compact">
+                            <select id="mediaTypeFilter">
+                                <option value="all" selected>All Media</option>
+                                <option value="movie">Movies</option>
+                                <option value="series">Series</option>
+                                <option value="episode">Episodes</option>
+                                <option value="game">Games</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <label>Media Type</label>
+                        </div>
+                        <div class="select-field compact">
+                            <select id="ratingFilter">
+                                <option value="all">All Ratings</option>
+                                <option value="10">10 Stars</option>
+                                <option value="9">9+ Stars</option>
+                                <option value="8">8+ Stars</option>
+                                <option value="7">7+ Stars</option>
+                                <option value="6">6+ Stars</option>
+                                <option value="5">5+ Stars</option>
+                                <option value="4">4+ Stars</option>
+                                <option value="3">3+ Stars</option>
+                                <option value="2">2+ Stars</option>
+                                <option value="1">1+ Stars</option>
+                            </select>
+                            <label>Filter</label>
+                        </div>
+                        <div class="select-field compact">
+                            <select id="sortOrder">
+                                <option value="rating_desc">Rating (High-Low)</option>
+                                <option value="rating_asc">Rating (Low-High)</option>
+                                <option value="title_asc">Title (A-Z)</option>
+                                <option value="title_desc">Title (Z-A)</option>
+                                <option value="year_desc">Year (New-Old)</option>
+                                <option value="year_asc">Year (Old-New)</option>
+                            </select>
+                            <label>Sort</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="userRatings" class="results-grid"></div>
+            </div>
+
+            <div id="media-search" class="media-section">
+                <div class="search-bar">
+                    <div class="input-field">
+                        <input type="text" id="searchQuery" placeholder=" ">
+                        <label for="searchQuery">Search movies...</label>
+                    </div>
+                    <button id="searchButton" class="ripple">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                </div>
+                <div id="searchResults" class="results-grid"></div>
+            </div>
+        </section>
+
+        <!-- Weather Section -->
+        <section id="weather-section" class="tab-content">
+            <div class="weather-card">
+                <div class="weather-search">
+                    <div class="input-field">
+                        <input type="text" id="cityInput" placeholder=" ">
+                        <label for="cityInput">Enter city name</label>
+                    </div>
+                    <button id="getWeatherBtn" class="ripple">
+                        <span class="material-symbols-outlined">travel_explore</span>
+                    </button>
+                </div>
+                <div id="weatherResult" class="weather-result">
+                    <p class="placeholder-text">Search for a city to see weather 🌤️</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Currency Section -->
+        <section id="currency-section" class="tab-content">
+            <div class="currency-card">
+                <div class="currency-inputs">
+                    <div class="input-field">
+                        <input type="number" id="amountInput" placeholder=" " value="1">
+                        <label for="amountInput">Amount</label>
+                    </div>
+                    <div class="select-field">
+                        <select id="fromCurrency">
+                            <option value="UAH">UAH</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="JPY">JPY</option>
+                            <option value="CAD">CAD</option>
+                        </select>
+                        <label>From</label>
+                    </div>
+                    <span class="material-symbols-outlined swap-icon">swap_horiz</span>
+                    <div class="select-field">
+                        <select id="toCurrency">
+                            <option value="USD">USD</option>
+                            <option value="UAH">UAH</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="JPY">JPY</option>
+                            <option value="CAD">CAD</option>
+                        </select>
+                        <label>To</label>
+                    </div>
+                </div>
+                <button id="convertBtn" class="ripple wide-button">
+                    <span class="material-symbols-outlined">currency_exchange</span>
+                    Convert
+                </button>
+                <div id="conversionResult" class="conversion-result">
+                    <p class="placeholder-text">Enter values to convert 💱</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tracker Section -->
+        <section id="tracker-section" class="tab-content">
+            <div id="userProducts" class="product-list"></div>
+            
+            <div class="fab-container">
+                <button id="addProductFab" class="fab-button ripple">
+                    <span class="material-symbols-outlined">add</span>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-tab="ratings-section">
+            <span class="material-symbols-outlined">star</span>
+            <span class="nav-label">Ratings</span>
+        </button>
+        <button class="nav-item" data-tab="weather-section">
+            <span class="material-symbols-outlined">cloudy</span>
+            <span class="nav-label">Weather</span>
+        </button>
+        <button class="nav-item" data-tab="currency-section">
+            <span class="material-symbols-outlined">payments</span>
+            <span class="nav-label">Currency</span>
+        </button>
+        <button class="nav-item" data-tab="tracker-section">
+            <span class="material-symbols-outlined">inventory</span>
+            <span class="nav-label">Tracker</span>
+        </button>
+    </nav>
+
+    <!-- Modals -->
+    <div id="ratingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Rate Movie 🎬</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div id="movieInfo"></div>
+            <div class="rating-selector">
+                <div class="rating-stars">
+                    <div class="star-container">
+                        <input type="radio" id="star10" name="rating" value="10">
+                        <label for="star10"></label>
+                        <input type="radio" id="star9" name="rating" value="9">
+                        <label for="star9"></label>
+                        <input type="radio" id="star8" name="rating" value="8">
+                        <label for="star8"></label>
+                        <input type="radio" id="star7" name="rating" value="7">
+                        <label for="star7"></label>
+                        <input type="radio" id="star6" name="rating" value="6">
+                        <label for="star6"></label>
+                        <input type="radio" id="star5" name="rating" value="5">
+                        <label for="star5"></label>
+                        <input type="radio" id="star4" name="rating" value="4">
+                        <label for="star4"></label>
+                        <input type="radio" id="star3" name="rating" value="3">
+                        <label for="star3"></label>
+                        <input type="radio" id="star2" name="rating" value="2">
+                        <label for="star2"></label>
+                        <input type="radio" id="star1" name="rating" value="1">
+                        <label for="star1"></label>
+                    </div>
+                    <div class="rating-value">5/10</div>
+                </div>
+                <button id="submitRating" class="ripple wide-button">
+                    <span class="material-symbols-outlined">check</span>
+                    Rate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Product 🛍️</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="addProductForm">
+                <div class="input-field">
+                    <input type="url" id="productUrl" required placeholder=" ">
+                    <label for="productUrl">Product URL</label>
+                </div>
+                <div class="supported-sites">
+                    <p>Supported sites: Steam, Comfy, Rozetka</p>
+                </div>
+                <button type="submit" class="ripple wide-button">
+                    <span class="material-symbols-outlined">add_task</span>
+                    Add Product
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    
+    <script src="js/api-client.js"></script>
+    <script src="js/ui-utils.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/ratings.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/weather.js"></script>
+    <script src="js/currency.js"></script>
+    <script src="js/products.js"></script>
+    <script src="js/main.js"></script>
+    <script src="debug-panel.js"></script>
+</body>
+</html>
